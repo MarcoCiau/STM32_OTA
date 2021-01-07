@@ -150,32 +150,27 @@ void handleFileUpload()
 }
 
 void handleFileDelete() {
-  //int binhigh = 0;
-  String FileList = "File: ";
-  String FName;
-  Dir dir = SPIFFS.openDir("/");
-  while (dir.next()) {
-    FName = dir.fileName();
+
+  if (SPIFFS.exists(fileNameBin)) 
+  {
+    server.send(200, "text/html", makePage("Deleted", "<h2>" + String(fileNameBin) + " be deleted!<br><br><a style=\"color:white\" href=\"/list\">Return </a></h2>"));
+    SPIFFS.remove(fileNameBin);
   }
-  FileList += FName;
-  if (SPIFFS.exists(FName)) {
-    server.send(200, "text/html", makePage("Deleted", "<h2>" + FileList + " be deleted!<br><br><a style=\"color:white\" href=\"/list\">Return </a></h2>"));
-    SPIFFS.remove(FName);
-  }
-  else
-    return server.send(404, "text/html", makePage("File Not found", "404"));
+  else return server.send(404, "text/html", makePage("File Not found", "404"));
 }
 
 
 void handleListFiles()
 {
+  String boardName = "Unknow Device";
   String FileList = "Bootloader Ver: ";
   String Listcode;
   char blversion = 0;
   Dir dir = SPIFFS.openDir("/");
   blversion = stm32Version();
+  STM32Prog.getBoardName(&boardName);
   FileList += String((blversion >> 4) & 0x0F) + "." + String(blversion & 0x0F) + "<br> MCU: ";
-  FileList += "STM32 Board";//STM32_CHIPNAME[stm32GetId()];
+  FileList += boardName;
   FileList += "<br><br> File: ";
   while (dir.next())
   {
