@@ -43,23 +43,14 @@
 #include <stm32ota.h>
 #include <stm32Programmer.h>
 
-// const String STM32_CHIPNAME[8] = {
-//   "Unknown Chip",
-//   "STM32F03xx4/6",
-//   "STM32F030x8/05x",
-//   "STM32F030xC",
-//   "STM32F103x4/6",
-//   "STM32F103x8/B",
-//   "STM32F103xC/D/E",
-//   "STM32F105/107"
-// };
-
 #define NRST 5
 #define BOOT0 4
 #define LED 2
 
 const char* ssid = "Ciau";
 const char* password = "EaSyNeTMilk2";
+
+const char * fileNameBin = "/stm32Fw.bin"; 
 
 ESP8266WebServer server(80);
 const char* serverIndex = "<h1>Upload STM32 BinFile</h1><h2><br><br><form method='POST' action='/upload' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Upload'></form></h2>";
@@ -89,20 +80,19 @@ void handleRoot()
 
 void handleFlash()
 {
-  String FileName = "/stm32Fw.bin";
   String flashwr;
 
   int lastbuf = 0;
   uint8_t cflag = 255;
 
-  if (!SPIFFS.exists(FileName))
+  if (!SPIFFS.exists(fileNameBin))
   {
     flashwr = "Error: file doesn't exists!";
   }
   else
   {
     /* Open File */
-    fsUploadFile = SPIFFS.open(FileName, "r");
+    fsUploadFile = SPIFFS.open(fileNameBin, "r");
     if (fsUploadFile) {
       bini = fsUploadFile.size() / 256; //byte to bits conversion
       lastbuf = fsUploadFile.size() % 256; 
@@ -134,7 +124,7 @@ void handleFlash()
             flashwr += "<br>Finished<br>";
           else flashwr = "Error";
         }
-      fsUploadFile.close();
+      fsUploadFile.close(); 
     }
   }
 
@@ -148,17 +138,14 @@ void handleFileUpload()
 {
   if (server.uri() != "/upload") return;
   HTTPUpload& upload = server.upload();
-  if (upload.status == UPLOAD_FILE_START) {
-    String filename = upload.filename;
-    if (!filename.startsWith("/")) filename = "/" + filename;
-    fsUploadFile = SPIFFS.open(filename, "w");
-    filename = String();
-  } else if (upload.status == UPLOAD_FILE_WRITE) {
-    if (fsUploadFile)
-      fsUploadFile.write(upload.buf, upload.currentSize);
-  } else if (upload.status == UPLOAD_FILE_END) {
-    if (fsUploadFile)
-      fsUploadFile.close();
+  if (upload.status == UPLOAD_FILE_START) fsUploadFile = SPIFFS.open(fileNameBin, "w");
+  else if (upload.status == UPLOAD_FILE_WRITE) 
+  {
+    if (fsUploadFile) fsUploadFile.write(upload.buf, upload.currentSize);
+  } 
+  else if (upload.status == UPLOAD_FILE_END) 
+  {
+    if (fsUploadFile)fsUploadFile.close();
   }
 }
 
