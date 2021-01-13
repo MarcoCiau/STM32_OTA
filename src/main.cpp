@@ -80,55 +80,56 @@ void handleRoot()
 
 void handleFlash()
 {
-  String flashwr;
+  String flashStatusStr = "<br>Device Programed. Finished<br>";
+  bool isDeviceProgramed = STM32Prog.program((char*)fileNameBin);
+  if (!isDeviceProgramed) flashStatusStr = "Error";
+  // int lastbuf = 0;
+  // uint8_t cflag = 255;
 
-  int lastbuf = 0;
-  uint8_t cflag = 255;
+  // if (!SPIFFS.exists(fileNameBin))
+  // {
+  //   flashwr += "Error: file doesn't exists!";
+  // }
+  // else
+  // {
+  //   /* Open File */
+  //   fsUploadFile = SPIFFS.open(fileNameBin, "r");
+  //   if (fsUploadFile) {
+  //     bini = fsUploadFile.size() / 256; //byte to bits conversion
+  //     lastbuf = fsUploadFile.size() % 256; 
 
-  if (!SPIFFS.exists(fileNameBin))
-  {
-    flashwr = "Error: file doesn't exists!";
-  }
-  else
-  {
-    /* Open File */
-    fsUploadFile = SPIFFS.open(fileNameBin, "r");
-    if (fsUploadFile) {
-      bini = fsUploadFile.size() / 256; //byte to bits conversion
-      lastbuf = fsUploadFile.size() % 256; 
+  //     flashwr = String(bini) + "-" + String(lastbuf) + "<br>";
 
-      flashwr = String(bini) + "-" + String(lastbuf) + "<br>";
+  //     //Send bin file content to STM32
+  //     for (int i = 0; i < bini; i++) {
+  //       fsUploadFile.read(binread, 256);
+  //       stm32SendCommand(STM32WR);
+  //       while (!Serial.available()) ; // add timeout here
+  //       cflag = Serial.read();
+  //       if (cflag == STM32ACK)
+  //         if (stm32Address(STM32STADDR + (256 * i)) == STM32ACK) {
+  //           if (stm32SendData(binread, 255) == STM32ACK)
+  //             flashwr += ".";
+  //           else flashwr = "Error";
+  //         }
+  //     }
 
-      //Send bin file content to STM32
-      for (int i = 0; i < bini; i++) {
-        fsUploadFile.read(binread, 256);
-        stm32SendCommand(STM32WR);
-        while (!Serial.available()) ; // add timeout here
-        cflag = Serial.read();
-        if (cflag == STM32ACK)
-          if (stm32Address(STM32STADDR + (256 * i)) == STM32ACK) {
-            if (stm32SendData(binread, 255) == STM32ACK)
-              flashwr += ".";
-            else flashwr = "Error";
-          }
-      }
+  //     //Send remainder data to ESP32
+  //     fsUploadFile.read(binread, lastbuf);
+  //     stm32SendCommand(STM32WR);
+  //     while (!Serial.available()) ;
+  //     cflag = Serial.read();
+  //     if (cflag == STM32ACK)
+  //       if (stm32Address(STM32STADDR + (256 * bini)) == STM32ACK) {
+  //         if (stm32SendData(binread, lastbuf) == STM32ACK)
+  //           flashwr += "<br>Finished<br>";
+  //         else flashwr = "Error";
+  //       }
+  //     fsUploadFile.close(); 
+  //   }
+  // }
 
-      //Send remainder data to ESP32
-      fsUploadFile.read(binread, lastbuf);
-      stm32SendCommand(STM32WR);
-      while (!Serial.available()) ;
-      cflag = Serial.read();
-      if (cflag == STM32ACK)
-        if (stm32Address(STM32STADDR + (256 * bini)) == STM32ACK) {
-          if (stm32SendData(binread, lastbuf) == STM32ACK)
-            flashwr += "<br>Finished<br>";
-          else flashwr = "Error";
-        }
-      fsUploadFile.close(); 
-    }
-  }
-
-  String flashhtml = "<h1>Programming</h1><h2>" + flashwr +  "<br><br><a style=\"color:white\" href=\"/up\">Upload STM32 BinFile</a><br><br><a style=\"color:white\" href=\"/list\">List STM32 BinFile</a></h2>";
+  String flashhtml = "<h1>Programming</h1><h2>" + flashStatusStr +  "<br><br><a style=\"color:white\" href=\"/up\">Upload STM32 BinFile</a><br><br><a style=\"color:white\" href=\"/list\">List STM32 BinFile</a></h2>";
   server.send(200, "text/html", makePage("Flash Page", flashhtml));
   
 }
