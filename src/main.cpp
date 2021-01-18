@@ -40,18 +40,8 @@
 // #include "spiffs/spiffs.h"            // Delete for ESP8266-Arduino 2.4.2 version
 #include <FS.h>
 #include <ESP8266mDNS.h>
-#include "stm32ota.h"
-
-const String STM32_CHIPNAME[8] = {
-  "Unknown Chip",
-  "STM32F03xx4/6",
-  "STM32F030x8/05x",
-  "STM32F030xC",
-  "STM32F103x4/6",
-  "STM32F103x8/B",
-  "STM32F103xC/D/E",
-  "STM32F105/107"
-};
+#include <stm32ota.h>
+#include <stm32Programmer.h>
 
 #define NRST 5
 #define BOOT0 4
@@ -59,6 +49,8 @@ const String STM32_CHIPNAME[8] = {
 
 const char* ssid = "Ciau";
 const char* password = "EaSyNeTMilk2";
+
+const char * fileNameBin = "/stm32Fw.bin"; 
 
 ESP8266WebServer server(80);
 const char* serverIndex = "<h1>Upload STM32 BinFile</h1><h2><br><br><form method='POST' action='/upload' enctype='multipart/form-data'><input type='file' name='update'><input type='submit' value='Upload'></form></h2>";
@@ -77,48 +69,69 @@ void RunMode();
 void FlashMode();
 void WiFiConnect();
 
+void handleRoot()
+{
+  STM32Prog.startFlashMode();
+  Runflag = 0;
+  if (!STM32Prog.getBoardName(&stringtmp)) stringtmp = "ERROR";
+  String starthtml = "<h1>STM32-OTA</h1><h2>Version 1.0 by <a style=\"color:white\" href=\"https://github.com/csnol/STM32-OTA\">CSNOL<br><br><a style=\"color:white\" href=\"/up\">Upload STM32 BinFile </a><br><br><a style=\"color:white\" href=\"/list\">List STM32 BinFile</a></h2>";
+  server.send(200, "text/html", makePage("Start Page", starthtml + "- Init MCU -<br> " + stringtmp));
+}
+
 void handleFlash()
 {
-  String FileName, flashwr;
-  int lastbuf = 0;
-  uint8_t cflag = 255;
-  Dir dir = SPIFFS.openDir("/");
-  while (dir.next())
-  {
-    FileName = dir.fileName();
-  }
-  fsUploadFile = SPIFFS.open(FileName, "r");
-  if (fsUploadFile) {
-    bini = fsUploadFile.size() / 256;
-    lastbuf = fsUploadFile.size() % 256;
-    flashwr = String(bini) + "-" + String(lastbuf) + "<br>";
-    for (int i = 0; i < bini; i++) {
-      fsUploadFile.read(binread, 256);
-      stm32SendCommand(STM32WR);
-      while (!Serial.available()) ;
-      cflag = Serial.read();
-      if (cflag == STM32ACK)
-        if (stm32Address(STM32STADDR + (256 * i)) == STM32ACK) {
-          if (stm32SendData(binread, 255) == STM32ACK)
-            flashwr += ".";
-          else flashwr = "Error";
-        }
-    }
-    fsUploadFile.read(binread, lastbuf);
-    stm32SendCommand(STM32WR);
-    while (!Serial.available()) ;
-    cflag = Serial.read();
-    if (cflag == STM32ACK)
-      if (stm32Address(STM32STADDR + (256 * bini)) == STM32ACK) {
-        if (stm32SendData(binread, lastbuf) == STM32ACK)
-          flashwr += "<br>Finished<br>";
-        else flashwr = "Error";
-      }
-    //flashwr += String(binread[0]) + "," + String(binread[lastbuf - 1]) + "<br>";
-    fsUploadFile.close();
-    String flashhtml = "<h1>Programming</h1><h2>" + flashwr +  "<br><br><a style=\"color:white\" href=\"/up\">Upload STM32 BinFile</a><br><br><a style=\"color:white\" href=\"/list\">List STM32 BinFile</a></h2>";
-    server.send(200, "text/html", makePage("Flash Page", flashhtml));
-  }
+  String flashStatusStr = "<br>Device Programed. Finished<br>";
+  bool isDeviceProgramed = STM32Prog.program((char*)fileNameBin);
+  if (!isDeviceProgramed) flashStatusStr = "Error";
+  // int lastbuf = 0;
+  // uint8_t cflag = 255;
+
+  // if (!SPIFFS.exists(fileNameBin))
+  // {
+  //   flashwr += "Error: file doesn't exists!";
+  // }
+  // else
+  // {
+  //   /* Open File */
+  //   fsUploadFile = SPIFFS.open(fileNameBin, "r");
+  //   if (fsUploadFile) {
+  //     bini = fsUploadFile.size() / 256; //byte to bits conversion
+  //     lastbuf = fsUploadFile.size() % 256; 
+
+  //     flashwr = String(bini) + "-" + String(lastbuf) + "<br>";
+
+  //     //Send bin file content to STM32
+  //     for (int i = 0; i < bini; i++) {
+  //       fsUploadFile.read(binread, 256);
+  //       stm32SendCommand(STM32WR);
+  //       while (!Serial.available()) ; // add timeout here
+  //       cflag = Serial.read();
+  //       if (cflag == STM32ACK)
+  //         if (stm32Address(STM32STADDR + (256 * i)) == STM32ACK) {
+  //           if (stm32SendData(binread, 255) == STM32ACK)
+  //             flashwr += ".";
+  //           else flashwr = "Error";
+  //         }
+  //     }
+
+  //     //Send remainder data to ESP32
+  //     fsUploadFile.read(binread, lastbuf);
+  //     stm32SendCommand(STM32WR);
+  //     while (!Serial.available()) ;
+  //     cflag = Serial.read();
+  //     if (cflag == STM32ACK)
+  //       if (stm32Address(STM32STADDR + (256 * bini)) == STM32ACK) {
+  //         if (stm32SendData(binread, lastbuf) == STM32ACK)
+  //           flashwr += "<br>Finished<br>";
+  //         else flashwr = "Error";
+  //       }
+  //     fsUploadFile.close(); 
+  //   }
+  // }
+
+  String flashhtml = "<h1>Programming</h1><h2>" + flashStatusStr +  "<br><br><a style=\"color:white\" href=\"/up\">Upload STM32 BinFile</a><br><br><a style=\"color:white\" href=\"/list\">List STM32 BinFile</a></h2>";
+  server.send(200, "text/html", makePage("Flash Page", flashhtml));
+  
 }
 
 
@@ -126,47 +139,39 @@ void handleFileUpload()
 {
   if (server.uri() != "/upload") return;
   HTTPUpload& upload = server.upload();
-  if (upload.status == UPLOAD_FILE_START) {
-    String filename = upload.filename;
-    if (!filename.startsWith("/")) filename = "/" + filename;
-    fsUploadFile = SPIFFS.open(filename, "w");
-    filename = String();
-  } else if (upload.status == UPLOAD_FILE_WRITE) {
-    if (fsUploadFile)
-      fsUploadFile.write(upload.buf, upload.currentSize);
-  } else if (upload.status == UPLOAD_FILE_END) {
-    if (fsUploadFile)
-      fsUploadFile.close();
+  if (upload.status == UPLOAD_FILE_START) fsUploadFile = SPIFFS.open(fileNameBin, "w");
+  else if (upload.status == UPLOAD_FILE_WRITE) 
+  {
+    if (fsUploadFile) fsUploadFile.write(upload.buf, upload.currentSize);
+  } 
+  else if (upload.status == UPLOAD_FILE_END) 
+  {
+    if (fsUploadFile)fsUploadFile.close();
   }
 }
 
 void handleFileDelete() {
-  //int binhigh = 0;
-  String FileList = "File: ";
-  String FName;
-  Dir dir = SPIFFS.openDir("/");
-  while (dir.next()) {
-    FName = dir.fileName();
+
+  if (SPIFFS.exists(fileNameBin)) 
+  {
+    server.send(200, "text/html", makePage("Deleted", "<h2>" + String(fileNameBin) + " be deleted!<br><br><a style=\"color:white\" href=\"/list\">Return </a></h2>"));
+    SPIFFS.remove(fileNameBin);
   }
-  FileList += FName;
-  if (SPIFFS.exists(FName)) {
-    server.send(200, "text/html", makePage("Deleted", "<h2>" + FileList + " be deleted!<br><br><a style=\"color:white\" href=\"/list\">Return </a></h2>"));
-    SPIFFS.remove(FName);
-  }
-  else
-    return server.send(404, "text/html", makePage("File Not found", "404"));
+  else return server.send(404, "text/html", makePage("File Not found", "404"));
 }
 
 
 void handleListFiles()
 {
+  String boardName = "Unknow Device";
   String FileList = "Bootloader Ver: ";
   String Listcode;
   char blversion = 0;
   Dir dir = SPIFFS.openDir("/");
   blversion = stm32Version();
+  STM32Prog.getBoardName(&boardName);
   FileList += String((blversion >> 4) & 0x0F) + "." + String(blversion & 0x0F) + "<br> MCU: ";
-  FileList += STM32_CHIPNAME[stm32GetId()];
+  FileList += boardName;
   FileList += "<br><br> File: ";
   while (dir.next())
   {
@@ -247,41 +252,13 @@ void setup(void)
       server.send(200, "text/html", makePage("Flash page", stringtmp));
     });
     server.on("/delete", HTTP_GET, handleFileDelete);
+
     server.onFileUpload(handleFileUpload);
+
     server.on("/upload", HTTP_POST, []() {
       server.send(200, "text/html", makePage("FileList", "<h1> Uploaded OK </h1><br><br><h2><a style=\"color:white\" href=\"/list\">Return </a></h2>"));
     });
-    server.on("/", HTTP_GET, []() {
-      if (Runflag == 1) {
-        FlashMode();
-        Runflag = 0;
-      }
-      //if (initflag == 0)
-      //{
-      Serial.write(STM32INIT);
-      delay(10);
-      if (Serial.available() > 0);
-      rdtmp = Serial.read();
-      if (rdtmp == STM32ACK)   {
-        //initflag = 1;
-        stringtmp = STM32_CHIPNAME[stm32GetId()];
-      }
-      else if (rdtmp == STM32NACK) {
-        Serial.write(STM32INIT);
-        delay(10);
-        if (Serial.available() > 0);
-        rdtmp = Serial.read();
-        if (rdtmp == STM32ACK)   {
-          //initflag = 1;
-          stringtmp = STM32_CHIPNAME[stm32GetId()];
-        }
-      }
-      else
-        stringtmp = "ERROR";
-      //}
-      String starthtml = "<h1>STM32-OTA</h1><h2>Version 1.0 by <a style=\"color:white\" href=\"https://github.com/csnol/STM32-OTA\">CSNOL<br><br><a style=\"color:white\" href=\"/up\">Upload STM32 BinFile </a><br><br><a style=\"color:white\" href=\"/list\">List STM32 BinFile</a></h2>";
-      server.send(200, "text/html", makePage("Start Page", starthtml + "- Init MCU -<br> " + stringtmp));
-    });
+    server.on("/", HTTP_GET, handleRoot);
     server.begin();
   }
 }

@@ -5,6 +5,21 @@
 */
 
 #include "stm32ota.h"
+#define SERIAL_MAX_RES_TIMEOUT_MS 5000
+
+unsigned char waitingForResponse()
+{
+  uint32_t serialResponseTimer = millis();
+  bool timeoutOcurred = false;
+  while (!Serial.available() && !timeoutOcurred)
+  {
+    timeoutOcurred = (millis() - serialResponseTimer) > SERIAL_MAX_RES_TIMEOUT_MS;
+  }
+
+  if (timeoutOcurred) return STM32NACK;
+
+  return Serial.read();
+}
 
 void stm32SendCommand(unsigned char commd) {    // Tested
   Serial.write(commd);
